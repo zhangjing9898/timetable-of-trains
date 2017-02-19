@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset="utf-8" />
+		<title>列车时刻表查询</title>
+		<meta name="viewport" content="width=device-width,initial-scale=1" />
+		<link rel="stylesheet" href="css/jquery.mobile-1.4.3.css" />
+	</head>
+	<body>
+		<!--把id设为index是方便jQuery mobile认识
+		data-role参数表：
+		page        页面容器，其内部的mobile元素将会继承这个容器上所设置的属性 
+		header     页面标题容器，这个容器内部可以包含文字、返回按钮、功能按钮等元素
+		footer       页面页脚容器，这个容器内部也可以包含文字、返回按钮、功能按钮等元素
+		content     页面内容容器，这是一个很宽容的容器，内部可以包含标准的html元素和jQueryMobile元素
+		controlgroup     将几个元素设置成一组，一般是几个相同的元素类型
+		fieldcontain       区域包裹容器，用增加边距和分割线的方式将容器内的元素和容器外的元素明显分隔
+		navbar     功能导航容器，通俗的讲就是工具条
+		listview     列表展示容器，类似手机中联系人列表的展示方式
+		list-divider      列表展示容器的表头，用来展示一组列表的标题，内部不可包含链接
+		button      按钮，将链接和普通按钮的样式设置成为jQueryMobile的风格
+		none        阻止框架对元素进行渲染，使元素以html原生的状态显示，主要用于form元素。-->
+		<div data-role="page" id="index">
+			<div data-role="header" data-position = "fixed">
+				<h1>列车时刻表查询</h1>
+			</div>
+			<div role="main" class="ui-content">
+				<div class="ui-field-contain">
+					<!--表单-->
+					<label>发车站：</label>
+					<input type="text" name="text-basic" id="search-begin" value="" />
+				</div>
+				<div class="ui-field-contain">
+					<!--表单-->
+					<label>终点站：</label>
+					<input type="text" name="text-basic" id="search-end" value="" />
+				</div>
+				<div class="ui-field-contain">
+					<!--表单-->
+					<label>车次：</label>
+					<input type="text" name="text-basic" id="search-no" value="" />
+				</div>
+				<input type="button" value="搜索" id="search-submit" />
+				<!--data-inset 规定可折叠按钮是否渲染成圆角且带外边距-->
+				<ul data-role = "listview" data-inset = "true" id="list"></ul>
+			</div>
+			<div data-role="footer">
+				<div data-role = "navbar" data-position = "fixed">
+					<ul>
+						<li>
+							<a href="#" data-icon = "grid" class="ui-btn-active">查询</a>
+						</li>
+						<li>
+							<a href="#" data-icon = "star">收藏</a>
+						</li>
+						<li>
+							<a href="#" data-icon = "gear">设置</a>
+						</li>
+					</ul>
+				</div>
+			</div>
+		</div>
+		<div data-role="page" id="detail">
+			<div data-role="header" data-position="fixed">
+				<h1>列车时刻表查询</h1>
+			</div>
+			<div role="main" class="ui-content">
+				<h2></h2>
+				<!--回流模型表格在屏幕尺寸足够大时是水平显示，而在屏幕尺寸达到足够小时，所有的数据会变成垂直显示。-->
+				<table data-role = "table" id="movie-table" data-mode="reflow" class="ui-responsive">
+					<thead>
+						<tr>
+							 <!--data-priority 属性指定隐藏列的顺序，data-priority 的值可以是 1 (最高优先级) 到 6 (最低优先级):-->
+							<th data-priority = "1">站名</th>
+							<th data-priority = "persist">到站时间</th>
+							<th data-priority = "persist">出发时间</th>
+						</tr>
+					</thead>
+					<tbody></tbody>
+				</table>
+				<a href="#" class="ui-btn ui-corner-all" data-rel = "back">返回</a>
+			</div>
+			<div data-role="footer">
+				<div data-role = "navbar" data-position = "fixed">
+					<ul>
+						<li>
+							<a href="#" data-icon = "grid" class="ui-btn-active">查询</a>
+						</li>
+						<li>
+							<a href="#" data-icon = "star">收藏</a>
+						</li>
+						<li>
+							<a href="#" data-icon = "gear">设置</a>
+						</li>
+					</ul>
+				</div>
+			</div>
+		</div>
+		<script type="text/javascript" src="js/jquery-1.11.1.js" ></script>
+		<script type="text/javascript" src="js/jquery.mobile-1.4.3.js" ></script>
+		<script>
+			var urlPre = "http://cors.itxti.net/?"; //跨域中转
+			var url1 = "www.webxml.com.cn/WebServices/TrainTimeWebService.asmx/getStationAndTimeByStationName?UserID=";
+			var url2 = "www.webxml.com.cn/WebServices/TrainTimeWebService.asmx/getStationAndTimeDataSetByLikeTrainCode?UserID=";
+			var url3 = "www.webxml.com.cn/WebServices/TrainTimeWebService.asmx/getDetailInfoByTrainCode?UserID=";
+			var isbind=0;
+			/*获取车次列表*/
+			var getTrainList=function(){
+				
+				/*数据校验*/
+				if($("#search-no").val()||($("#search-begin").val()&&$("#search-end").val())){
+					
+					var searchButton=$(this);
+					searchButton.button("option","disabled",true);
+					
+					$.mobile.loading("show");
+					
+					var _data={};
+					var _url=url1;
+					if(!$("#search-no").val()){
+						_data.StartStation=$("#search-begin").val();
+						_data.ArriveStation=$("#search-end").val();
+					}else{
+						_data.TrainCode=$("#search-no").val();
+						_url=url2;
+					}
+					
+					$.get(urlPre+_url,_data,function(data){
+						$("#list").html("");
+						var list=$("#list");
+						var timeTables=$(data).find("TimeTable");
+						
+						var _arr=[];
+						timeTables.each(function(index,obj){
+							var i=index;
+							if(i>10){
+								return false;/*只加载前10条*/
+							}
+							
+							var that=$(this);
+							if(that.find("FirstStation").text()=="数据没有被发现"){
+								alert("数据没有被发现！");
+								return false;
+							}
+							
+							_arr.push('<li><a href="#" data-no="'+that.find("TrainCode").text()+'">'+
+									'<h2>'+that.find("TrainCode").text()+'次</h2>'+
+									'<p>'+that.find("FirstStation").text()+"-"+that.find("LastStation").text()+'</p>'+
+									'<p>用时：'+that.find("UseDate").text()+'</p>'+
+									'<p class="ui-li-aside">'+that.find("StartTime").text()+' 开</p>'+
+									'</a></li>')
+							
+						})
+						
+						if(_arr.length>0){
+							list.html(_arr.join(""));
+							list.listview("refresh");
+						}
+						
+						$.mobile.loading("hide");
+						
+						searchButton.button("option","disabled",false);
+					})
+					
+				}else{
+					alert("请输入发车站和终点站或者输入车次！")
+				}
+			};
+			var isAjax=false;
+			/*获取详情*/
+			var getInfoByTrainCode=function(){
+				
+				$.mobile.loading("show");
+				
+				var trainCode=$(this).attr("data-no");
+				
+				/*避免重复点击，增加服务器负担*/
+				if(isAjax) return;
+				isAjax=true;
+				
+				$.get(urlPre+url3,{TrainCode:trainCode},function(data){
+					isAjax=false;
+					$('#detail').find(".ui-content h2").html(trainCode+"次");
+					var tbody=$("#detail").find(".ui-content tbody");
+					tbody.html("");
+					
+					$(data).find("TrainDetailInfo").each(function(index,obj){
+						var tr=$("<tr></tr>");
+						var that=$(this);
+						
+						tr.html('<td>'+that.find("TrainStation").text()+'</td>'+
+								'<td>'+that.find("ArriveTime").text()+'</td>'+
+								'<td>'+that.find("StartTime").text()+'</td>');
+						tbody.append(tr);
+					});
+					
+					$.mobile.loading("hide");
+					$.mobile.changePage("#detail");
+				})
+			};
+			
+			/*绑定事件*/
+			var bindEvent=function(){
+				$("#search-submit").on("click",getTrainList);
+				$("#list").on("click","a",getInfoByTrainCode);
+			};
+			
+			$(document).on("pageshow","#index",function(){
+				/*避免重复调用*/
+				if(isbind) return;
+				isbind=1;
+				bindEvent();
+			})
+			
+		</script>
+	</body>
+</html>
